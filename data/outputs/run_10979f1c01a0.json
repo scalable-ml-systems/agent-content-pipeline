@@ -1,0 +1,134 @@
+{
+  "run_id": "run_10979f1c01a0",
+  "topic": "Speculative decoding in LLM inference",
+  "post": "One thing that stands out to me:\n\nThis topic matters because it affects how teams build credible, production-oriented systems.\n\n- Speculative decoding | LLM Inference Handbook - BentoML presents a relevant claim or perspective related to the topic.\n- Speculative decoding: Faster inference for LLMs over the network? presents a relevant claim or perspective related to the topic.\n- Speculative Decoding - vLLM presents a relevant claim or perspective related to the topic.\n\nWhat matters in practice:\n- Grounding and validation directly affect output quality.\n- System design matters as much as generation quality.\n\nA more interesting angle: The bottleneck is often not generation itself, but how evidence is transformed and preserved.",
+  "image_prompts": [
+    "Minimal high-contrast system diagram representing Speculative decoding in LLM inference, layered pipeline, evidence flow between stages, clean geometric layout, no text",
+    "Professional editorial illustration for Speculative decoding in LLM inference, structured boxes and arrows, grounded technical workflow, dark neutral background, no text",
+    "Abstract architecture visual for Speculative decoding in LLM inference, signals moving through validation gates and transformation layers, minimalist style, no text"
+  ],
+  "sources": [
+    "https://bentoml.com/llm/inference-optimization/speculative-decoding",
+    "https://www.reddit.com/r/ChatGPTCoding/comments/1ov8p3q/speculative_decoding_faster_inference_for_llms/",
+    "https://docs.vllm.ai/en/latest/features/speculative_decoding/",
+    "https://www.youtube.com/watch?v=VkWlLSTdHs8",
+    "https://arxiv.org/html/2411.13157v1"
+  ],
+  "facts": [
+    {
+      "fact": "Speculative decoding | LLM Inference Handbook - BentoML presents a relevant claim or perspective related to the topic.",
+      "source_url": "https://bentoml.com/llm/inference-optimization/speculative-decoding",
+      "source_title": "Speculative decoding | LLM Inference Handbook - BentoML",
+      "fact_type": "claim",
+      "evidence_snippet": "# Speculative decoding. Speculative decoding is an inference-time optimization that speeds up LLM token generation without reducing output quality. With the right draft model, you can achieve **up to 3× faster LLM inference** using speculative decoding. When the target model verifies multiple draft tokens at once, it makes better use of GPU resources and reduces ITL. Speculative decoding is the application of speculative sampling to inference from autoregressive models, like transformers. Speculative decoding can accelerate LLM inference, but only when the draft and target models align well. **Acceptance rate (α)**: The probability of accepting draft tokens by the target model. **Speculative token count (γ)**: The number of tokens the draft model proposes each step. To study this, the Bento team patched vLLM to simulate speculative decoding at different α and γ values (no draft model and the target model accepts tokens at preset rates). When the target model rejects too many draft tokens, your GPU still spends time generating and verifying them.",
+      "confidence": "medium"
+    },
+    {
+      "fact": "Speculative decoding: Faster inference for LLMs over the network? presents a relevant claim or perspective related to the topic.",
+      "source_url": "https://www.reddit.com/r/ChatGPTCoding/comments/1ov8p3q/speculative_decoding_faster_inference_for_llms/",
+      "source_title": "Speculative decoding: Faster inference for LLMs over the network?",
+      "fact_type": "claim",
+      "evidence_snippet": "First a bit of context, speculative decoding is a technique whereby a draft model (usually a smaller LLM) is engaged to produce tokens and the",
+      "confidence": "medium"
+    },
+    {
+      "fact": "Speculative Decoding - vLLM presents a relevant claim or perspective related to the topic.",
+      "source_url": "https://docs.vllm.ai/en/latest/features/speculative_decoding/",
+      "source_title": "Speculative Decoding - vLLM",
+      "fact_type": "claim",
+      "evidence_snippet": "This document shows how to use Speculative Decoding with vLLM to reduce inter-token latency under medium-to-low QPS (query per second), memory-bound workloads. To train your own draft models for optimized speculative decoding, see vllm-project/speculators for seamless training and integration with vLLM. vLLM supports a variety of methods of speculative decoding. | Suffix decoding | Low to medium gain | Medium gain | No extra draft model; dynamic speculation depth. 2. **Algorithmic Losslessness** - vLLM’s implementation of speculative decoding is algorithmically validated to be lossless. This verifies that vLLM's speculative decoding framework, when integrated with the vLLM forward pass and the vLLM rejection sampler, provides a lossless guarantee. For more details, see the FAQ section titled *Can the output of a prompt vary across runs in vLLM?* in the FAQs. While vLLM strives to ensure losslessness in speculative decoding, variations in generated outputs with and without speculative decoding can occur due to following factors:. 2. Speculative decoding with a draft models is not supported in `vllm<=0.10.0`. * A Hacker's Guide to Speculative Decoding in vLLM.",
+      "confidence": "medium"
+    },
+    {
+      "fact": "Faster LLMs: Accelerate Inference with Speculative Decoding presents a relevant claim or perspective related to the topic.",
+      "source_url": "https://www.youtube.com/watch?v=VkWlLSTdHs8",
+      "source_title": "Faster LLMs: Accelerate Inference with Speculative Decoding",
+      "fact_type": "claim",
+      "evidence_snippet": "https://ibm.biz/BdnJtG Want faster large language models? Isaac Ke explains speculative decoding, a technique that accelerates LLM inference",
+      "confidence": "medium"
+    },
+    {
+      "fact": "Closer Look at Efficient Inference Methods: A Survey of Speculative ... presents a relevant claim or perspective related to the topic.",
+      "source_url": "https://arxiv.org/html/2411.13157v1",
+      "source_title": "Closer Look at Efficient Inference Methods: A Survey of Speculative ...",
+      "fact_type": "claim",
+      "evidence_snippet": "Similarly, speculative decoding involves generating a draft sequence of tokens using a smaller, faster model which operates in parallel with a",
+      "confidence": "medium"
+    }
+  ],
+  "summary": {
+    "context": "This topic matters because it affects how teams build credible, production-oriented systems.",
+    "insights": [
+      "Speculative decoding | LLM Inference Handbook - BentoML presents a relevant claim or perspective related to the topic.",
+      "Speculative decoding: Faster inference for LLMs over the network? presents a relevant claim or perspective related to the topic.",
+      "Speculative Decoding - vLLM presents a relevant claim or perspective related to the topic."
+    ],
+    "implications": [
+      "Grounding and validation directly affect output quality.",
+      "System design matters as much as generation quality."
+    ],
+    "contrarian_angle": "The bottleneck is often not generation itself, but how evidence is transformed and preserved."
+  },
+  "validation": {
+    "draft_ok": false,
+    "style_ok": false,
+    "issues": [
+      {
+        "step": "extract_facts",
+        "severity": "medium",
+        "message": "LLM extraction failed; using fallback fact extraction."
+      },
+      {
+        "step": "summarize",
+        "severity": "medium",
+        "message": "LLM summarization failed; using fallback summary."
+      },
+      {
+        "step": "draft_post",
+        "severity": "medium",
+        "message": "LLM drafting failed; using fallback draft."
+      },
+      {
+        "step": "validate_draft",
+        "severity": "medium",
+        "message": "Draft validation could not be completed reliably."
+      },
+      {
+        "step": "apply_style",
+        "severity": "medium",
+        "message": "Style rewrite failed; using original draft."
+      },
+      {
+        "step": "validate_style",
+        "severity": "medium",
+        "message": "Style validation could not be completed reliably."
+      },
+      {
+        "step": "generate_image_prompts",
+        "severity": "medium",
+        "message": "Image prompt generation failed; using fallback prompts."
+      }
+    ]
+  },
+  "errors": [
+    "extract_facts LLM error: LLM request failed: 500 Server Error: Internal Server Error for url: https://api.openai.com/v1/responses",
+    "summarize LLM error: LLM request failed: 500 Server Error: Internal Server Error for url: https://api.openai.com/v1/responses",
+    "draft_post LLM error: LLM request failed: 500 Server Error: Internal Server Error for url: https://api.openai.com/v1/responses",
+    "validate_draft error: LLM request failed: 500 Server Error: Internal Server Error for url: https://api.openai.com/v1/responses",
+    "apply_style LLM error: LLM request failed: 500 Server Error: Internal Server Error for url: https://api.openai.com/v1/responses",
+    "validate_style error: LLM request failed: 500 Server Error: Internal Server Error for url: https://api.openai.com/v1/responses",
+    "generate_image_prompts LLM error: LLM request failed: 500 Server Error: Internal Server Error for url: https://api.openai.com/v1/responses"
+  ],
+  "metadata": {
+    "artifact_version": "phase1.v1",
+    "created_at": "2026-03-31T18:48:59.229656+00:00",
+    "persisted_at": "2026-03-31T18:49:04.412366+00:00",
+    "template_version": "v1",
+    "models": {},
+    "output_path": "data/outputs/run_10979f1c01a0.json",
+    "step_count": 8,
+    "issue_count": 7,
+    "error_count": 7,
+    "status": "error"
+  }
+}

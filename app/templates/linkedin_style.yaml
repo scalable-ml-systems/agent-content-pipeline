@@ -1,0 +1,21 @@
+voice_rules:
+  - "Warm, credible, technical"
+  - "Concrete over clever"
+  - "Prefer clarity over hype"
+  - "Short to medium sentence length"
+  - "Engineering-flavored language is welcome when it improves precision"
+
+do:
+  - "Use grounded hooks"
+  - "Keep the writing human and direct"
+  - "Make the takeaway practical"
+  - "Preserve nuance when evidence is limited"
+
+dont:
+  - "Do not exaggerate"
+  - "Do not use generic motivational language"
+  - "Do not sound like marketing copy"
+  - "Do not add unsupported facts"
+  - "Do not force punchiness at the expense of truth"
+
+examples: []
