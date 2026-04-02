@@ -1,58 +1,82 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from pathlib import Path
+from dataclasses import dataclass
 
-from app.config import get_settings
-from app.models import PipelineOutput, Summary, ValidationState
-from app.utils.files import ensure_directory
-from app.utils.json_io import write_json_file
-
-
-def _utc_now_iso() -> str:
-    return datetime.now(UTC).isoformat()
+from app.runtime.artifacts import ArtifactType
+from app.runtime.errors import ValidationStepError
+from app.runtime.retry import RetryPolicy
+from app.runtime.types import RunState, StepResult
 
 
-def build_output(state: dict) -> dict:
-    output = PipelineOutput(
-        run_id=state["run_id"],
-        topic=state["topic"],
-        post=state["derived"]["styled_post"],
-        image_prompts=state["derived"]["image_prompts"],
-        sources=state["sources"],
-        facts=state["derived"]["facts"],
-        summary=Summary(**state["derived"]["summary"]),
-        validation=ValidationState(**state["validation"]),
-        errors=state["errors"],
-    )
+NO_RETRY_POLICY = RetryPolicy(max_attempts=1, backoff_seconds=())
 
-    payload = output.model_dump(mode="json")
 
-    settings = get_settings()
-    output_dir = ensure_directory(settings.output_dir)
-    output_path = Path(output_dir) / f"{state['run_id']}.json"
+@dataclass(slots=True)
+class BuildOutputStep:
+    name: str = "build_output"
+    retry_policy: RetryPolicy = NO_RETRY_POLICY
 
-    payload["metadata"] = {
-        "artifact_version": "phase1.v1",
-        "created_at": state["metadata"].get("created_at", ""),
-        "persisted_at": _utc_now_iso(),
-        "template_version": state["metadata"].get("template_version", ""),
-        "models": state["metadata"].get("models", {}),
-        "output_path": str(output_path),
-        "step_count": len(state.get("step_logs", [])),
-        "issue_count": len(state.get("validation", {}).get("issues", [])),
-        "error_count": len(state.get("errors", [])),
-        "status": (
-            "error"
-            if state.get("errors")
-            else "degraded"
-            if state.get("validation", {}).get("issues")
-            else "ok"
-        ),
-    }
+    def run(self, state: RunState) -> StepResult:
+        if not state.synthesis:
+            raise ValidationStepError("Cannot build output without synthesis.")
+        if not state.draft_post:
+            raise ValidationStepError("Cannot build output without draft_post.")
+        if not state.draft_validation:
+            raise ValidationStepError("Cannot build output without draft_validation.")
+        if not state.styled_post:
+            raise ValidationStepError("Cannot build output without styled_post.")
+        if not state.style_validation:
+            raise ValidationStepError("Cannot build output without style_validation.")
 
-    state["final_output"] = payload
-    write_json_file(output_path, payload)
-    state["metadata"]["output_path"] = str(output_path)
+        final_output = {
+            "run_id": state.run_id,
+            "topic": state.topic,
+            "status": state.status.value,
+            "artifacts": {
+                "synthesis_artifact_id": state.latest_artifact_id_by_type.get(
+                    ArtifactType.SYNTHESIS.value
+                ),
+                "draft_post_artifact_id": state.latest_artifact_id_by_type.get(
+                    ArtifactType.DRAFT_POST.value
+                ),
+                "draft_validation_artifact_id": state.latest_artifact_id_by_type.get(
+                    ArtifactType.DRAFT_VALIDATION.value
+                ),
+                "styled_post_artifact_id": state.latest_artifact_id_by_type.get(
+                    ArtifactType.STYLED_POST.value
+                ),
+                "style_validation_artifact_id": state.latest_artifact_id_by_type.get(
+                    ArtifactType.STYLE_VALIDATION.value
+                ),
+                "image_prompts_artifact_id": state.latest_artifact_id_by_type.get(
+                    ArtifactType.IMAGE_PROMPTS.value
+                ),
+            },
+            "synthesis": state.synthesis,
+            "draft_post": state.draft_post,
+            "draft_validation": state.draft_validation,
+            "styled_post": state.styled_post,
+            "style_validation": state.style_validation,
+            "image_prompts": state.image_prompts,
+            "completed_steps": list(state.completed_steps),
+        }
 
-    return state
+        return StepResult.success(
+            step_name=self.name,
+            state_updates={"final_output": final_output},
+            artifacts=[
+                {
+                    "artifact_type": ArtifactType.FINAL_OUTPUT,
+                    "payload": final_output,
+                    "metadata": {
+                        "topic": state.topic,
+                        "run_id": state.run_id,
+                    },
+                }
+            ],
+            message="Final output artifact built successfully.",
+            metrics={
+                "completed_step_count": len(state.completed_steps),
+                "image_prompt_count": len(state.image_prompts),
+            },
+        )

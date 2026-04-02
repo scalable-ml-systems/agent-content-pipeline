@@ -35,25 +35,22 @@ def main() -> None:
     print("Failed step:", final_state.failed_step)
     print("Error:", final_state.error)
 
-    print("\nSynthesis:")
-    print(final_state.synthesis)
-
-    print("\nDraft:")
-    print(final_state.draft_post)
-
     print("\nDraft validation:")
     print(final_state.draft_validation)
-
-    print("\nStyled post:")
-    print(final_state.styled_post)
 
     print("\nStyle validation:")
     print(final_state.style_validation)
 
+    print("\nImage prompts:")
+    print(final_state.image_prompts)
+
+    print("\nFinal output:")
+    print(final_state.final_output)
+
     print("\nLatest artifact IDs by type:")
     print(final_state.latest_artifact_id_by_type)
 
-    print("\nAll artifacts:")
+    print("\nArtifacts:")
     for artifact in final_state.artifact_store.all():
         print(
             {

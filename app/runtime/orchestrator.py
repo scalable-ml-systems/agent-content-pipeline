@@ -48,7 +48,17 @@ class Orchestrator:
 
             state.completed_steps.append(step.name)
 
+            gate_error = self._check_validation_gate(step_name=step.name, state=state)
+            if gate_error is not None:
+                state.mark_failed(step_name=step.name, error=gate_error)
+                return state
+
         state.mark_succeeded()
+
+        # Keep final_output.status aligned with real final run status if final_output exists.
+        if state.final_output and isinstance(state.final_output, dict):
+            state.final_output["status"] = state.status.value
+
         return state
 
     def _execute_step_with_retry(self, *, state: RunState, step) -> StepResult:
@@ -130,6 +140,19 @@ class Orchestrator:
             )
             artifact_id = state.artifact_store.write(artifact)
             state.register_artifact(artifact_type=artifact_type, artifact_id=artifact_id)
+
+    def _check_validation_gate(self, *, step_name: str, state: RunState) -> str | None:
+        if step_name == "validate_draft":
+            report = state.draft_validation
+            if isinstance(report, dict) and report.get("ok") is False:
+                return "Draft validation failed."
+
+        if step_name == "validate_style":
+            report = state.style_validation
+            if isinstance(report, dict) and report.get("ok") is False:
+                return "Style validation failed."
+
+        return None
 
     @staticmethod
     def _validate_step_result(expected_step_name: str, result: StepResult) -> None:
