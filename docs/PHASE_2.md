@@ -1,77 +1,64 @@
-PHASE_2.md — Bounded Agent Runtime with RAG‑Augmented Execution
-Overview
-Phase 2 evolves the system from a fixed sequential pipeline into a bounded, graph‑capable orchestration runtime with retrieval‑augmented grounding (RAG).
+# PHASE 2 — Bounded Agent Runtime with RAG-Augmented Execution
+
+## Overview
+
+Phase 2 evolves the system from a fixed sequential pipeline into a bounded, graph-capable orchestration runtime with retrieval-augmented grounding (RAG).
 
 The system transitions from:
 
-Code
+```
 linear execution
         ↓
-adaptive, validation‑driven execution with structured state, retrieval, and persistence
+adaptive, validation-driven execution with structured state, retrieval, and persistence
+```
+
 The goal is to build a system that is:
 
-grounded (evidence‑backed)
+- **Grounded** — evidence-backed
+- **Inspectable** — full traceability
+- **Bounded** — no uncontrolled loops
+- **Replayable** — persistent state
+- **Adaptive** — conditional routing
+- **Measurable** — evaluation + observability
 
-inspectable (full traceability)
+---
 
-bounded (no uncontrolled loops)
+## Core Principle
 
-replayable (persistent state)
+> Deterministic execution harness with bounded nondeterministic generation and retrieval-constrained context
 
-adaptive (conditional routing)
+**Deterministic runtime behavior:**
+- graph traversal
+- retries and limits
+- branching conditions
+- state transitions
 
-measurable (evaluation + observability)
+**Probabilistic LLM behavior, constrained via:**
+- structured inputs
+- RAG-bounded context
+- validators as execution gates
 
-Core Principle
-Deterministic execution harness with bounded nondeterministic generation and retrieval‑constrained context
-Deterministic runtime behavior:
+---
 
-graph traversal
+## Phase 1 → Phase 2 Evolution
 
-retries and limits
+| Dimension | Phase 1 | Phase 2 |
+|---|---|---|
+| Execution | Sequential pipeline | Graph-capable runtime |
+| Context | Raw search → prompt chaining | Retrieval-augmented context (RAG) |
+| Artifacts | Raw text chaining | Typed artifacts |
+| Validation | Post-check | Validation-driven control flow |
+| State | None | Persistent execution state |
+| Agents | None | Specialized agents |
+| Evaluation | None | Evaluation harness |
 
-branching conditions
+---
 
-state transitions
+## System Architecture
 
-Probabilistic LLM behavior, but constrained via:
+### High-Level Flow
 
-structured inputs
-
-RAG‑bounded context
-
-validators as execution gates
-
-Phase 1 → Phase 2 Evolution
-Phase 1
-Sequential pipeline
-
-Raw search → prompt chaining
-
-No retrieval layer
-
-Validation as post‑check
-
-JSON output artifact
-
-Phase 2
-Graph‑capable runtime
-
-Retrieval‑augmented context (RAG)
-
-Typed artifacts instead of raw text chaining
-
-Validation‑driven control flow
-
-Persistent execution state
-
-Agent specialization
-
-Evaluation harness
-
-System Architecture
-High‑Level Flow
-Code
+```
 topic
   ↓
 Orchestrator Runtime
@@ -83,12 +70,15 @@ Research → Evidence → Retrieval → Synthesis → Draft → Validation → S
 Persistent State Store (DB)
   ↓
 Final Output + Full Execution Trace
-Pipeline (Phase 2)
-Code
+```
+
+### Pipeline (Phase 2)
+
+```
 topic
   └── search_web                → raw sources
   └── extract_facts             → atomic facts
-  └── retrieve_context (RAG)    → top‑k evidence chunks
+  └── retrieve_context (RAG)    → top-k evidence chunks
   └── validate_retrieval        → quality + coverage check
   └── summarize                 → structured synthesis
   └── draft_post                → neutral post
@@ -97,26 +87,28 @@ topic
   └── validate_style            → drift detection
   └── generate_image_prompts    → visual prompts
   └── build_output              → persisted artifact
-Runtime Components
-1. Orchestrator (Control Plane)
+```
+
+---
+
+## Runtime Components
+
+### 1. Orchestrator (Control Plane)
+
 Responsible for:
+- graph traversal
+- retry + backoff
+- branching decisions
+- state updates
+- safe termination
 
-graph traversal
+> The orchestrator never generates content.
 
-retry + backoff
+### 2. Execution Graph
 
-branching decisions
-
-state updates
-
-safe termination
-
-The orchestrator never generates content.
-
-2. Execution Graph
 A bounded DAG with conditional edges:
 
-Code
+```
 extract_facts
   → retrieve_context
   → validate_retrieval
@@ -130,18 +122,18 @@ validate_draft
 validate_style
   → pass → generate_image_prompts
   → fail → revise_style
-Constraints:
+```
 
-no infinite loops
+**Constraints:**
+- no infinite loops
+- bounded retries
+- explicit termination conditions
 
-bounded retries
+### 3. Central Run State
 
-explicit termination conditions
+All steps operate on a shared structured state:
 
-3. Central Run State
-All steps operate on a shared structured state.
-
-python
+```python
 @dataclass
 class RunState:
     run_id: str
@@ -165,24 +157,26 @@ class RunState:
     image_prompts: list[str]
 
     status: str
-RAG Layer (NEW)
-Purpose
-Replace raw prompt‑to‑prompt context propagation with:
+```
 
-retrieval of bounded, relevant, source‑linked evidence
+---
 
-Step: retrieve_context
-Input:
+## RAG Layer (NEW)
 
-topic
+### Purpose
 
-extracted facts
+Replace raw prompt-to-prompt context propagation with retrieval of bounded, relevant, source-linked evidence.
 
-source documents
+### Step: `retrieve_context`
 
-Output:
+**Input:**
+- topic
+- extracted facts
+- source documents
 
-json
+**Output:**
+
+```json
 {
   "retrieved_context": [
     {
@@ -194,217 +188,185 @@ json
     }
   ]
 }
-Retrieval Strategy
-chunk source documents
+```
 
-embed chunks
+### Retrieval Strategy
 
-vector search (top‑k)
+1. Chunk source documents
+2. Embed chunks
+3. Vector search (top-k)
+4. Query built from topic, extracted facts, and key entities
 
-query built from:
+### Step: `validate_retrieval`
 
-topic
-
-extracted facts
-
-key entities
-
-Step: validate_retrieval
 Ensures:
+- sufficient coverage of facts
+- source diversity
+- minimal duplication
+- relevance threshold
 
-sufficient coverage of facts
+### Why RAG Matters
 
-source diversity
+| Without RAG | With RAG |
+|---|---|
+| Prompt size grows uncontrollably | Bounded context |
+| Grounding weakens | Explicit provenance |
+| Hallucination risk increases | Smaller prompts |
+| No traceability | Stronger validation |
 
-minimal duplication
+---
 
-relevance threshold
+## Step Contracts
 
-Why RAG Matters
-Without RAG:
-
-prompt size grows uncontrollably
-
-grounding weakens
-
-hallucination risk increases
-
-With RAG:
-
-bounded context
-
-explicit provenance
-
-smaller prompts
-
-stronger validation
-
-Step Contracts
 Each step is a typed unit:
 
-python
+```python
 class Step(Protocol):
     name: str
 
     def run(self, state: RunState) -> StepResult:
         ...
+```
+
 Each step defines:
+- inputs (from state)
+- outputs (to state)
+- retry policy
+- model routing
+- validation hooks
 
-inputs (from state)
+---
 
-outputs (to state)
+## Agent Specialization
 
-retry policy
+| Agent | Responsibility |
+|---|---|
+| `ResearchAgent` | search + expansion |
+| `EvidenceAgent` | fact extraction |
+| `RetrievalAgent` | RAG retrieval + ranking |
+| `SynthesisAgent` | summarization |
+| `DraftingAgent` | draft + style |
+| `VerificationAgent` | validation |
+| `Orchestrator` | execution control |
 
-model routing
+---
 
-validation hooks
+## Validators (Execution Gates)
 
-Agent Specialization
-Agent	Responsibility
-ResearchAgent	search + expansion
-EvidenceAgent	fact extraction
-RetrievalAgent	RAG retrieval + ranking
-SynthesisAgent	summarization
-DraftingAgent	draft + style
-VerificationAgent	validation
-Orchestrator	execution control
-Validators (Execution Gates)
-Validator	Purpose
-Retrieval Validator	ensures evidence quality
-Fact Coverage Validator	ensures sufficient information
-Groundedness Validator	checks unsupported claims
-Style Drift Validator	prevents exaggeration
+| Validator | Purpose |
+|---|---|
+| Retrieval Validator | ensures evidence quality |
+| Fact Coverage Validator | ensures sufficient information |
+| Groundedness Validator | checks unsupported claims |
+| Style Drift Validator | prevents exaggeration |
+
 Validators can:
+- allow progression
+- trigger retry
+- trigger branch
+- terminate execution
 
-allow progression
+---
 
-trigger retry
+## Retry Policy
 
-trigger branch
-
-terminate execution
-
-Retry Policy
-Code
+```
 MAX_STEP_RETRIES = 2
 BACKOFF = [1s, 2s]
+```
+
 Applied to:
+- LLM failures
+- retrieval failures
+- validation failures
 
-LLM failures
+---
 
-retrieval failures
+## Persistent Execution Layer
 
-validation failures
+### Tables
 
-Persistent Execution Layer
-Tables
-runs
+**`runs`**
+- `run_id`
+- `topic`
+- `status`
+- `timestamps`
 
-run_id
+**`step_runs`**
+- `step_name`
+- `attempt`
+- `status`
+- `latency`
+- `error`
 
-topic
+**`artifacts`**
+- `type` (facts, retrieval, draft, etc.)
+- `payload` (JSON)
 
-status
+### Observability
 
-timestamps
-
-step_runs
-
-step_name
-
-attempt
-
-status
-
-latency
-
-error
-
-artifacts
-
-type (facts, retrieval, draft, etc.)
-
-payload (JSON)
-
-Observability
 Each step emits:
+- `step_name`
+- `model_used`
+- `latency`
+- `token_usage`
+- `retrieval_scores`
+- `validation_scores`
+- `retry_count`
 
-step_name
+---
 
-model_used
+## Evaluation Harness
 
-latency
+**Metrics:**
+- groundedness score
+- unsupported claims
+- retrieval quality score
+- style drift score
+- retry frequency
+- token usage
+- latency
 
-token usage
+---
 
-retrieval scores
+## Execution Model
 
-validation scores
+### Deterministic Control
+- graph traversal fixed
+- retries bounded
+- validation gates enforced
 
-retry count
+### Controlled Non-Determinism
+- LLM outputs probabilistic
+- retrieval results ranked
+- outputs constrained via schema + validators
 
-Evaluation Harness
-Metrics:
+---
 
-groundedness score
+## Design Constraints
 
-unsupported claims
+- No unbounded loops
+- No raw prompt chaining across steps
+- All context must be retrieved or structured
+- Every output must be traceable to a source
+- All steps must be replayable
 
-retrieval quality score
+---
 
-style drift score
+## Definition of Done
 
-retry frequency
+Phase 2 is complete when the system can:
 
-token usage
+- [ ] Execute via graph with conditional routing
+- [ ] Retrieve and validate evidence via RAG
+- [ ] Operate on structured artifacts (not raw text)
+- [ ] Retry steps safely
+- [ ] Persist and replay runs
+- [ ] Enforce validation before progression
+- [ ] Evaluate quality across runs
 
-latency
+---
 
-Execution Model
-Deterministic Control
-graph traversal fixed
+## Outcome
 
-retries bounded
-
-validation gates enforced
-
-Controlled Non‑Determinism
-LLM outputs probabilistic
-
-retrieval results ranked
-
-outputs constrained via schema + validators
-
-Design Constraints
-No unbounded loops
-
-No raw prompt chaining across steps
-
-All context must be retrieved or structured
-
-Every output must be traceable to source
-
-All steps must be replayable
-
-Definition of Done
-Phase 2 is complete when the system can:
-
-execute via graph with conditional routing
-
-retrieve and validate evidence via RAG
-
-operate on structured artifacts (not raw text)
-
-retry steps safely
-
-persist and replay runs
-
-enforce validation before progression
-
-evaluate quality across runs
-
-Outcome
-At the end of Phase 2, the system becomes:
-
-a production‑grade, retrieval‑augmented agent runtime capable of grounded, adaptive, and observable execution with bounded control.
+At the end of Phase 2, the system becomes a **production-grade, retrieval-augmented agent runtime** capable of grounded, adaptive, and observable execution with bounded control.

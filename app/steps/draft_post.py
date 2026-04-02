@@ -1,73 +1,106 @@
 from __future__ import annotations
 
-import json
+from dataclasses import dataclass
 
-from app.clients.llm_client import LLMClientError, get_llm_client
-from app.state import append_error, append_validation_issue
-from app.utils.files import read_text_file
-
-
-def _build_user_prompt(summary: dict) -> str:
-    return json.dumps({"summary": summary}, indent=2, ensure_ascii=False)
+from app.llm_client import LLMClientError, get_llm_client
+from app.runtime.artifacts import ArtifactType
+from app.runtime.errors import ProviderStepError, ValidationStepError
+from app.runtime.retry import DEFAULT_RETRY_POLICY, RetryPolicy
+from app.runtime.types import RunState, StepResult
 
 
-def _fallback_draft(summary: dict) -> str:
-    lines = [
-        "One thing that stands out to me:",
-        "",
-        summary.get("context", ""),
-        "",
-    ]
+@dataclass(slots=True)
+class DraftPostStep:
+    name: str = "draft_post"
+    retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY
 
-    for insight in summary.get("insights", []):
-        lines.append(f"- {insight}")
+    def run(self, state: RunState) -> StepResult:
+        if not state.synthesis:
+            raise ValidationStepError("Cannot draft post without synthesis.")
 
-    if summary.get("implications"):
-        lines.append("")
-        lines.append("What matters in practice:")
-        for implication in summary["implications"]:
-            lines.append(f"- {implication}")
+        system_prompt = """
+You are a technical content drafting engine.
 
-    contrarian_angle = summary.get("contrarian_angle", "").strip()
-    if contrarian_angle:
-        lines.append("")
-        lines.append(f"A more interesting angle: {contrarian_angle}")
+Write a neutral, source-grounded LinkedIn post draft.
 
-    return "\n".join(lines).strip()
+Rules:
+- Use only the provided synthesis.
+- Do not exaggerate.
+- Do not invent claims or statistics.
+- Keep the draft concise and professional.
+- Avoid hashtags.
+- Output plain text only.
+""".strip()
 
+        user_prompt = self._build_user_prompt(topic=state.topic, synthesis=state.synthesis)
 
-def draft_post(state: dict) -> dict:
-    summary = state["derived"]["summary"]
-    if not summary:
-        append_validation_issue(
-            state,
-            step="draft_post",
-            severity="medium",
-            message="No summary available for drafting.",
+        client = get_llm_client()
+
+        try:
+            raw_output = client.generate(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                temperature=0.3,
+                task="draft",
+            )
+        except TypeError:
+            try:
+                raw_output = client.generate(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    temperature=0.3,
+                )
+            except LLMClientError as exc:
+                raise ProviderStepError(str(exc)) from exc
+        except LLMClientError as exc:
+            raise ProviderStepError(str(exc)) from exc
+
+        draft_post = raw_output.strip()
+        if not draft_post:
+            raise ValidationStepError("Draft post step returned empty content.")
+
+        return StepResult.success(
+            step_name=self.name,
+            state_updates={"draft_post": draft_post},
+            artifacts=[
+                {
+                    "artifact_type": ArtifactType.DRAFT_POST,
+                    "payload": {"text": draft_post},
+                    "metadata": {
+                        "topic": state.topic,
+                        "source_synthesis_artifact_id": state.latest_artifact_id_by_type.get(
+                            ArtifactType.SYNTHESIS.value
+                        ),
+                    },
+                }
+            ],
+            message="Neutral draft post created successfully.",
+            metrics={
+                "draft_length_chars": len(draft_post),
+            },
         )
-        state["derived"]["draft"] = ""
-        return state
 
-    system_prompt = read_text_file("app/prompts/draft_post.txt")
-    user_prompt = _build_user_prompt(summary)
-    client = get_llm_client()
+    def _build_user_prompt(self, *, topic: str, synthesis: dict) -> str:
+        context = synthesis.get("context", "")
+        insights = synthesis.get("insights", [])
+        implications = synthesis.get("implications", [])
+        contrarian_angle = synthesis.get("contrarian_angle", "")
 
-    try:
-        response_text = client.generate(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            temperature=0.2,
-        )
-        state["raw"]["llm_outputs"]["draft_post"] = response_text
-        state["derived"]["draft"] = response_text.strip()
-    except LLMClientError as exc:
-        append_error(state, f"draft_post LLM error: {exc}")
-        append_validation_issue(
-            state,
-            step="draft_post",
-            severity="medium",
-            message="LLM drafting failed; using fallback draft.",
-        )
-        state["derived"]["draft"] = _fallback_draft(summary)
+        sections: list[str] = [
+            f"Topic: {topic}",
+            "",
+            f"Context: {context}",
+            "",
+            "Insights:",
+        ]
+        sections.extend(f"- {item}" for item in insights)
 
-    return state
+        sections.append("")
+        sections.append("Implications:")
+        sections.extend(f"- {item}" for item in implications)
+
+        if contrarian_angle:
+            sections.append("")
+            sections.append(f"Contrarian angle: {contrarian_angle}")
+
+        return "\n".join(sections).strip()
