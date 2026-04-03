@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from app.runtime.artifacts import ArtifactType, new_artifact
 from app.runtime.errors import StateContractError
 from app.runtime.graph import RuntimeGraph
+from app.runtime.persistence import RuntimePersistence
 from app.runtime.step_registry import StepRegistry
 from app.runtime.types import (
     ExecutionEvent,
@@ -24,6 +25,7 @@ MAX_STYLE_RECOVERY_LOOPS = 1
 class Orchestrator:
     registry: StepRegistry
     graph: RuntimeGraph
+    persistence: RuntimePersistence | None = None
 
     def run(self, state: RunState) -> RunState:
         if state.status not in {RunStatus.PENDING, RunStatus.RUNNING}:
@@ -32,6 +34,7 @@ class Orchestrator:
             )
 
         state.mark_running()
+        self._persist_run_created(state)
 
         current_step_name: str | None = self.graph.entry_step()
 
@@ -44,6 +47,7 @@ class Orchestrator:
                     step_name=step.name,
                     error=final_result.error or "Step failed without an error message.",
                 )
+                self._persist_run_updated(state)
                 return state
 
             try:
@@ -52,9 +56,11 @@ class Orchestrator:
             except Exception as exc:
                 error_message = f"Failed to commit outputs from '{step.name}': {exc}"
                 state.mark_failed(step_name=step.name, error=error_message)
+                self._persist_run_updated(state)
                 return state
 
             state.completed_steps.append(step.name)
+            self._persist_run_updated(state)
 
             next_step_name = self._resolve_next_step(state=state, current_step_name=step.name)
             if next_step_name is None and step.name != "build_output":
@@ -62,6 +68,7 @@ class Orchestrator:
                     step_name=step.name,
                     error=f"No valid next step found after '{step.name}'.",
                 )
+                self._persist_run_updated(state)
                 return state
 
             current_step_name = next_step_name
@@ -71,6 +78,7 @@ class Orchestrator:
         if state.final_output and isinstance(state.final_output, dict):
             state.final_output["status"] = state.status.value
 
+        self._persist_run_updated(state)
         return state
 
     def _execute_step_with_retry(self, *, state: RunState, step) -> StepResult:
@@ -85,19 +93,19 @@ class Orchestrator:
 
                 self._validate_step_result(expected_step_name=step.name, result=result)
 
-                state.events.append(
-                    ExecutionEvent(
-                        run_id=state.run_id,
-                        step_name=step.name,
-                        attempt=attempt,
-                        status=result.status,
-                        started_at=started_at,
-                        finished_at=finished_at,
-                        message=result.message,
-                        error=result.error,
-                        metrics=result.metrics,
-                    )
+                event = ExecutionEvent(
+                    run_id=state.run_id,
+                    step_name=step.name,
+                    attempt=attempt,
+                    status=result.status,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    message=result.message,
+                    error=result.error,
+                    metrics=result.metrics,
                 )
+                state.events.append(event)
+                self._persist_step_event(state.run_id, event)
 
                 return result
 
@@ -105,17 +113,17 @@ class Orchestrator:
                 finished_at = utc_now()
                 error_message = f"{type(exc).__name__}: {exc}"
 
-                state.events.append(
-                    ExecutionEvent(
-                        run_id=state.run_id,
-                        step_name=step.name,
-                        attempt=attempt,
-                        status=StepStatus.FAILED,
-                        started_at=started_at,
-                        finished_at=finished_at,
-                        error=error_message,
-                    )
+                event = ExecutionEvent(
+                    run_id=state.run_id,
+                    step_name=step.name,
+                    attempt=attempt,
+                    status=StepStatus.FAILED,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    error=error_message,
                 )
+                state.events.append(event)
+                self._persist_step_event(state.run_id, event)
 
                 if not step.retry_policy.should_retry(exc, attempt):
                     return StepResult.failure(
@@ -152,6 +160,7 @@ class Orchestrator:
             )
             artifact_id = state.artifact_store.write(artifact)
             state.register_artifact(artifact_type=artifact_type, artifact_id=artifact_id)
+            self._persist_artifact(state.run_id, artifact)
 
     def _resolve_next_step(
         self,
@@ -200,6 +209,22 @@ class Orchestrator:
             return True
 
         raise StateContractError(f"Unknown edge condition '{edge_condition}'")
+
+    def _persist_run_created(self, state: RunState) -> None:
+        if self.persistence is not None:
+            self.persistence.create_run(state)
+
+    def _persist_run_updated(self, state: RunState) -> None:
+        if self.persistence is not None:
+            self.persistence.update_run(state)
+
+    def _persist_step_event(self, run_id: str, event: ExecutionEvent) -> None:
+        if self.persistence is not None:
+            self.persistence.record_step_event(run_id, event)
+
+    def _persist_artifact(self, run_id: str, artifact) -> None:
+        if self.persistence is not None:
+            self.persistence.record_artifact(run_id, artifact)
 
     @staticmethod
     def _validate_step_result(expected_step_name: str, result: StepResult) -> None:

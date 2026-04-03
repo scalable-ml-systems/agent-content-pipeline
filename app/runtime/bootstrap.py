@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.runtime.graph import RuntimeGraph
 from app.runtime.orchestrator import Orchestrator
+from app.runtime.persistence import RuntimePersistence
 from app.runtime.step_registry import StepRegistry
 from app.steps.apply_style import ApplyStyleStep
 from app.steps.build_output import BuildOutputStep
@@ -12,9 +13,10 @@ from app.steps.revise_style import ReviseStyleStep
 from app.steps.summarize import SummarizeStep
 from app.steps.validate_draft import ValidateDraftStep
 from app.steps.validate_style import ValidateStyleStep
+from app.store.repository import SQLiteRuntimeRepository
 
 
-def build_orchestrator() -> Orchestrator:
+def build_orchestrator(db_path: str = "data/runtime.db") -> Orchestrator:
     registry = StepRegistry()
     registry.register(SummarizeStep())
     registry.register(DraftPostStep())
@@ -60,4 +62,11 @@ def build_orchestrator() -> Orchestrator:
 
     graph.add_edge(from_step="generate_image_prompts", to_step="build_output")
 
-    return Orchestrator(registry=registry, graph=graph)
+    repository = SQLiteRuntimeRepository(db_path=db_path)
+    persistence = RuntimePersistence(repository=repository)
+
+    return Orchestrator(
+        registry=registry,
+        graph=graph,
+        persistence=persistence,
+    )

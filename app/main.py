@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import json
 from uuid import uuid4
 
 from app.runtime.bootstrap import build_orchestrator
+from app.runtime.persistence import RuntimePersistence
 from app.runtime.types import RunState
+from app.store.repository import SQLiteRuntimeRepository
 
 
 def main() -> None:
-    orchestrator = build_orchestrator()
+    db_path = "data/runtime.db"
+    orchestrator = build_orchestrator(db_path=db_path)
 
     state = RunState(
         run_id=str(uuid4()),
@@ -35,44 +39,17 @@ def main() -> None:
     print("Failed step:", final_state.failed_step)
     print("Error:", final_state.error)
 
-    print("\nDraft validation:")
-    print(final_state.draft_validation)
-
-    print("\nStyle validation:")
-    print(final_state.style_validation)
-
-    print("\nImage prompts:")
-    print(final_state.image_prompts)
-
     print("\nFinal output:")
-    print(final_state.final_output)
+    print(json.dumps(final_state.final_output, indent=2))
 
-    print("\nLatest artifact IDs by type:")
-    print(final_state.latest_artifact_id_by_type)
+    persistence = RuntimePersistence(
+        repository=SQLiteRuntimeRepository(db_path=db_path)
+    )
+    persisted = persistence.get_run_summary(final_state.run_id)
 
-    print("\nArtifacts:")
-    for artifact in final_state.artifact_store.all():
-        print(
-            {
-                "artifact_id": artifact.artifact_id,
-                "type": artifact.artifact_type.value,
-                "step_name": artifact.step_name,
-                "metadata": artifact.metadata,
-            }
-        )
-
-    print("\nExecution events:")
-    for event in final_state.events:
-        print(
-            {
-                "step": event.step_name,
-                "attempt": event.attempt,
-                "status": event.status.value,
-                "duration_ms": event.duration_ms,
-                "error": event.error,
-            }
-        )
-
+    print("\nPersisted run summary:")
+    print(json.dumps(persisted, indent=2))
+    
 
 if __name__ == "__main__":
     main()
