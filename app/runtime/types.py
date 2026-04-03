@@ -5,8 +5,6 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from app.runtime.artifacts import ArtifactStore, ArtifactType
-
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -50,7 +48,6 @@ class StepResult:
     step_name: str
     status: StepStatus
     state_updates: dict[str, Any] = field(default_factory=dict)
-    artifacts: list[dict[str, Any]] = field(default_factory=list)
     message: str | None = None
     error: str | None = None
     metrics: dict[str, Any] = field(default_factory=dict)
@@ -61,7 +58,6 @@ class StepResult:
         *,
         step_name: str,
         state_updates: dict[str, Any] | None = None,
-        artifacts: list[dict[str, Any]] | None = None,
         message: str | None = None,
         metrics: dict[str, Any] | None = None,
     ) -> "StepResult":
@@ -69,7 +65,6 @@ class StepResult:
             step_name=step_name,
             status=StepStatus.SUCCEEDED,
             state_updates=state_updates or {},
-            artifacts=artifacts or [],
             message=message,
             metrics=metrics or {},
         )
@@ -87,7 +82,6 @@ class StepResult:
             step_name=step_name,
             status=StepStatus.FAILED,
             state_updates={},
-            artifacts=[],
             message=message,
             error=error,
             metrics=metrics or {},
@@ -112,11 +106,9 @@ class RunState:
     style_validation: dict[str, Any] | None = None
     image_prompts: list[str] = field(default_factory=list)
     final_output: dict[str, Any] | None = None
-
-    artifact_store: ArtifactStore = field(default_factory=ArtifactStore)
-    artifact_ids_by_type: dict[str, list[str]] = field(default_factory=dict)
-    latest_artifact_id_by_type: dict[str, str] = field(default_factory=dict)
-
+    step_attempt_counters: dict[str, int] = field(default_factory=dict)
+    branch_counters: dict[str, int] = field(default_factory=dict)
+    
     events: list[ExecutionEvent] = field(default_factory=list)
     completed_steps: list[str] = field(default_factory=list)
     failed_step: str | None = None
@@ -145,7 +137,15 @@ class RunState:
                 raise ValueError(f"RunState has no field named '{key}'")
             setattr(self, key, value)
 
-    def register_artifact(self, artifact_type: ArtifactType, artifact_id: str) -> None:
-        type_key = artifact_type.value
-        self.artifact_ids_by_type.setdefault(type_key, []).append(artifact_id)
-        self.latest_artifact_id_by_type[type_key] = artifact_id
+    def increment_step_attempt(self, step_name: str) -> int:
+        next_value = self.step_attempt_counters.get(step_name, 0) + 1
+        self.step_attempt_counters[step_name] = next_value
+        return next_value
+
+    def increment_branch_counter(self, key: str) -> int:
+        next_value = self.branch_counters.get(key, 0) + 1
+        self.branch_counters[key] = next_value
+        return next_value
+
+    def get_branch_counter(self, key: str) -> int:
+        return self.branch_counters.get(key, 0)        

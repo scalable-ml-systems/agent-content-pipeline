@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from app.runtime.artifacts import ArtifactType, new_artifact
 from app.runtime.errors import StateContractError
+from app.runtime.graph import RuntimeGraph
 from app.runtime.step_registry import StepRegistry
 from app.runtime.types import (
     ExecutionEvent,
@@ -15,10 +16,14 @@ from app.runtime.types import (
     utc_now,
 )
 
+MAX_DRAFT_RECOVERY_LOOPS = 1
+MAX_STYLE_RECOVERY_LOOPS = 1
+
 
 @dataclass(slots=True)
 class Orchestrator:
     registry: StepRegistry
+    graph: RuntimeGraph
 
     def run(self, state: RunState) -> RunState:
         if state.status not in {RunStatus.PENDING, RunStatus.RUNNING}:
@@ -28,7 +33,10 @@ class Orchestrator:
 
         state.mark_running()
 
-        for step in self.registry.ordered_steps():
+        current_step_name: str | None = self.graph.entry_step()
+
+        while current_step_name is not None:
+            step = self.registry.get(current_step_name)
             final_result = self._execute_step_with_retry(state=state, step=step)
 
             if final_result.status == StepStatus.FAILED:
@@ -48,14 +56,18 @@ class Orchestrator:
 
             state.completed_steps.append(step.name)
 
-            gate_error = self._check_validation_gate(step_name=step.name, state=state)
-            if gate_error is not None:
-                state.mark_failed(step_name=step.name, error=gate_error)
+            next_step_name = self._resolve_next_step(state=state, current_step_name=step.name)
+            if next_step_name is None and step.name != "build_output":
+                state.mark_failed(
+                    step_name=step.name,
+                    error=f"No valid next step found after '{step.name}'.",
+                )
                 return state
+
+            current_step_name = next_step_name
 
         state.mark_succeeded()
 
-        # Keep final_output.status aligned with real final run status if final_output exists.
         if state.final_output and isinstance(state.final_output, dict):
             state.final_output["status"] = state.status.value
 
@@ -141,18 +153,53 @@ class Orchestrator:
             artifact_id = state.artifact_store.write(artifact)
             state.register_artifact(artifact_type=artifact_type, artifact_id=artifact_id)
 
-    def _check_validation_gate(self, *, step_name: str, state: RunState) -> str | None:
-        if step_name == "validate_draft":
-            report = state.draft_validation
-            if isinstance(report, dict) and report.get("ok") is False:
-                return "Draft validation failed."
+    def _resolve_next_step(
+        self,
+        *,
+        state: RunState,
+        current_step_name: str,
+    ) -> str | None:
+        outgoing = self.graph.outgoing(current_step_name)
+        if not outgoing:
+            return None
 
-        if step_name == "validate_style":
-            report = state.style_validation
-            if isinstance(report, dict) and report.get("ok") is False:
-                return "Style validation failed."
+        for edge in outgoing:
+            if self._edge_matches(state=state, edge_condition=edge.condition):
+                return edge.to_step
 
         return None
+
+    def _edge_matches(self, *, state: RunState, edge_condition: str) -> bool:
+        if edge_condition == "always":
+            return True
+
+        if edge_condition == "on_draft_validation_passed":
+            report = state.draft_validation
+            return isinstance(report, dict) and report.get("ok") is True
+
+        if edge_condition == "on_draft_validation_failed":
+            report = state.draft_validation
+            if not (isinstance(report, dict) and report.get("ok") is False):
+                return False
+            if state.get_branch_counter("draft_recovery") >= MAX_DRAFT_RECOVERY_LOOPS:
+                return False
+            state.increment_branch_counter("draft_recovery")
+            return True
+
+        if edge_condition == "on_style_validation_passed":
+            report = state.style_validation
+            return isinstance(report, dict) and report.get("ok") is True
+
+        if edge_condition == "on_style_validation_failed":
+            report = state.style_validation
+            if not (isinstance(report, dict) and report.get("ok") is False):
+                return False
+            if state.get_branch_counter("style_recovery") >= MAX_STYLE_RECOVERY_LOOPS:
+                return False
+            state.increment_branch_counter("style_recovery")
+            return True
+
+        raise StateContractError(f"Unknown edge condition '{edge_condition}'")
 
     @staticmethod
     def _validate_step_result(expected_step_name: str, result: StepResult) -> None:
