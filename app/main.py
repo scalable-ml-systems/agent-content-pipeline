@@ -4,7 +4,7 @@ import json
 from uuid import uuid4
 
 from app.runtime.bootstrap import build_orchestrator
-from app.runtime.persistence import RuntimePersistence
+from app.runtime.replay import RuntimeReplayer
 from app.runtime.types import RunState
 from app.store.repository import SQLiteRuntimeRepository
 
@@ -42,14 +42,11 @@ def main() -> None:
     print("\nFinal output:")
     print(json.dumps(final_state.final_output, indent=2))
 
-    persistence = RuntimePersistence(
-        repository=SQLiteRuntimeRepository(db_path=db_path)
-    )
-    persisted = persistence.get_run_summary(final_state.run_id)
+    replayer = RuntimeReplayer(repository=SQLiteRuntimeRepository(db_path=db_path))
+    report = replayer.render_text_report(final_state.run_id)
 
-    print("\nPersisted run summary:")
-    print(json.dumps(persisted, indent=2))
-    
+    print("\n" + report)
+
 
 if __name__ == "__main__":
     main()

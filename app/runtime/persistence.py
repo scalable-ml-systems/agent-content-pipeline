@@ -42,3 +42,13 @@ class RuntimePersistence:
             "step_runs": self.repository.list_step_runs(run_id),
             "artifacts": self.repository.list_artifacts(run_id),
         }
+
+    def get_run_bundle(self, run_id: str) -> dict | None:
+        return self.repository.get_run_bundle(run_id)
+
+    def list_step_runs(self, run_id: str) -> list[dict]:
+        return self.repository.list_step_runs(run_id)
+
+    def list_artifacts(self, run_id: str) -> list[dict]:
+        return self.repository.list_artifacts(run_id)
+        

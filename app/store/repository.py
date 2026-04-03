@@ -212,3 +212,23 @@ class SQLiteRuntimeRepository:
                 }
             )
         return results
+    
+    def get_run_bundle(self, run_id: str) -> dict[str, Any] | None:
+        run = self.get_run(run_id)
+        if run is None:
+            return None
+
+        return {
+            "run": {
+                "run_id": run.run_id,
+                "topic": run.topic,
+                "status": run.status,
+                "error": run.error,
+                "failed_step": run.failed_step,
+                "started_at": run.started_at,
+                "finished_at": run.finished_at,
+                "created_at": run.created_at,
+            },
+            "step_runs": self.list_step_runs(run_id),
+            "artifacts": self.list_artifacts(run_id),
+        }    
